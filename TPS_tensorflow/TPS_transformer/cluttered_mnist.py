@@ -11,44 +11,23 @@ X_valid = mnist_cluttered['X_valid']
 y_valid = mnist_cluttered['y_valid']
 X_test = mnist_cluttered['X_test']
 y_test = mnist_cluttered['y_test']
-
 # % turn from dense to one hot representation
 Y_train = dense_to_one_hot(y_train, n_classes=10)
 Y_valid = dense_to_one_hot(y_valid, n_classes=10)
 Y_test = dense_to_one_hot(y_test, n_classes=10)
-
 # %% Graph representation of our network
-
 # %% Placeholders for 40x40 resolution
 x = tf.placeholder(tf.float32, [None, 1600])
 y = tf.placeholder(tf.float32, [None, 10])
-
-# %% Since x is currently [batch, height*width], we need to reshape to a
-# 4-D tensor to use it in a convolutional graph.  If one component of
-# `shape` is the special value -1, the size of that dimension is
-# computed so that the total size remains constant.  Since we haven't
-# defined the batch dimension's shape yet, we use -1 to denote this
-# dimension should not change size.
 x_tensor = tf.reshape(x, [-1, 40, 40, 1])
-
-# %% We'll setup the two-layer localisation network to figure out the
-# %% parameters for an affine transformation of the input
-# %% Create variables for fully connected layer
 W_fc_loc1 = weight_variable([1600, 20])
 b_fc_loc1 = bias_variable([20])
 
 W_fc_loc2 = weight_variable([20, 32])
-
-#W_fc_loc2 = weight_variable([20, 6])
-# Use identity transformation as starting point
-#initial = np.array([[0, 1., 0], [0, 0, 1.]])
-#initial = np.array([[0.5 ,-0.1, 0.1 ,0.5, -0.5 ,-0.1, 0.1 ,0.5 ,-0.5, -0.1, 0.1, 0.5, -0.5 ,-0.1, 0.1 ,0.5],[-0.5, -0.5 ,-0.5 ,-0.5 ,-0.1, -0.1, -0.1, -0.1, 0.1, 0.1, 0.1 ,0.1, 0.5, 0.5 ,0.5,0.5]])
 initial = np.array([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5.],[-5., -5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]])
-
 initial = initial.astype('float32')
 initial = initial.flatten()
 b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
-
 # %% Define the two layer localisation network
 h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
 # %% We can add dropout for regularizing and to reduce overfitting like so:
@@ -59,27 +38,15 @@ h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1_drop, W_fc_loc2) + b_fc_loc2)
 
 # %% We'll create a spatial transformer module to identify discriminative
 # %% patches
-
 out_size = (40, 40)
 Column_controlP_number = 4
 Row_controlP_number = 4
 h_trans = transformer(x_tensor, h_fc_loc2, out_size, Column_controlP_number,Row_controlP_number)
-#h_trans = transformer(x_tensor, h_fc_loc2, out_size)
-
-# %% We'll setup the first convolutional layer
-# Weight matrix is [height x width x input_channels x output_channels]
 filter_size = 3
 n_filters_1 = 16
 W_conv1 = weight_variable([filter_size, filter_size, 1, n_filters_1])
-
 # %% Bias is [output_channels]
 b_conv1 = bias_variable([n_filters_1])
-
-# %% Now we can build a graph which does the first layer of convolution:
-# we define our stride as batch x height x width x channels
-# instead of pooling, we use strides of 2 and more layers
-# with smaller filters.
-
 h_conv1 = tf.nn.relu(
     tf.nn.conv2d(input=h_trans,
                  filter=W_conv1,
