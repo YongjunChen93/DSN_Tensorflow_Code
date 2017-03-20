@@ -170,12 +170,6 @@ def meshgrid(num_batch,height, width,Column_controlP_number,Row_controlP_number)
     ones = tf.ones_like(x_t_flat) 
     grid = tf.concat([ones, x_t_flat, y_t_flat,R],0)
     return grid
-#def test_case1():
-#file = open('1.png', 'rb')
-#data = file.read()
-#image = tf.image.decode_png(data, channels=1)
-#image = tf.expand_dims(image, 0)
-#input_summary = tf.summary.image("input_image", image)
 U=tf.random_uniform([1,40,40,1],minval=0,maxval=130)
 U = tf.reshape(U,[40,40,1])
 U =tf.cast(U,'uint8')
@@ -191,8 +185,6 @@ out_size = (40,40)
 x_s_flat,y_s_flat = tf.linspace(-1.,1.,out_size[0]),tf.linspace(-1.,1.,out_size[1])
 x_s_flat,y_s_flat = tf.meshgrid(x_s_flat,y_s_flat)
 x_s_flat,y_s_flat = tf.reshape(x_s_flat,[-1]),tf.reshape(y_s_flat,[-1])
-#print("x_s_flat",sess.run(tf.shape(x_s_flat)))
-#print("x_s_flat",sess.run(x_s_flat))
 input_transformed = interpolate(U, U_org, x_s_flat, y_s_flat,out_size)
 
 print(sess.run(tf.shape(input_transformed)))
@@ -217,85 +209,3 @@ writer.add_summary(summary)
 writer.close()
 sess.close()
 pass
-
-'''
-#===================Case 2======================#
-#print(sess.run(output))
-
-U=tf.multiply(tf.ones([1,40,40,1]),130)
-print(sess.run(U))
-U = tf.reshape(U,[40,40,1])
-U =tf.cast(U,'uint8')
-U = tf.image.encode_png(U)
-U = tf.image.decode_png(U)
-U = tf.expand_dims(U,0)
-input_summary = tf.summary.image("input_image_3", U)
-U=tf.multiply(tf.ones([1,40,40,1]),180)
-U_org=tf.multiply(tf.ones([1,40,40,1]),10)
-out_size = (40,40)
-
-num_batch = 1
-height = 40
-width = 40
-num_channels = 1    
-#T = makeT(tf.constant([[0,1.,0,0,0,1.]]),4,4)
-T = makeT(tf.constant([[-1.,-0.33333331,0.33333337,1.,-1.,-0.33333331,0.33333337,1.,-1.,-0.33333331,0.33333337,1.,-1.,-0.33333331,0.33333337,1.,-1.,-1.,-1.,-1., -0.33333331, -0.33333331,-0.33333331,-0.33333331,0.33333337,0.33333337,0.33333337,0.33333337,1.,1.,1.,1.]]),4,4)
-
-#T = makeT(tf.constant([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5.,-5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]]),4,4)
-#T = makeT(tf.constant([[0.5 ,-0.1, 0.1 ,0.5, -0.5 ,-0.1, 0.1 ,0.5 ,-0.5, -0.1, 0.1, 0.5, -0.5 ,-0.1, 0.1 ,0.5, -0.5, -0.5 ,-0.5 ,-0.5 ,-0.1, -0.1, -0.1, -0.1, 0.1, 0.1, 0.1 ,0.1, 0.5, 0.5 ,0.5,0.5]]),4,4)
-print("T,",sess.run(T))
-
-T = tf.reshape(T, (-1, 2, 19))
-T = tf.cast(T, 'float32')
-#T = tf.cast(T, 'float32')
-#print(sess.run(tf.shape(T)))
-height_f = tf.cast(height, 'float32')
-width_f = tf.cast(width, 'float32')
-out_height = 40
-out_width = 40
-print("========Fen=ge========")
-grid = meshgrid(1,40,40,4,4)
-grid = tf.expand_dims(grid, 0)
-grid = tf.reshape(grid, [-1])
-print(sess.run(tf.shape(grid)))
-grid = tf.tile(grid, tf.stack([num_batch]))
-print(sess.run(tf.shape(grid)))
-grid = tf.reshape(grid, tf.stack([num_batch, 19, -1]))
-print(sess.run(tf.shape(grid)))
-
-print("grid",sess.run(grid))
-T_g = tf.matmul(T, grid)
-print("Output_grid:",sess.run(tf.shape(T_g)))
-print("Output_grid_value")
-print(sess.run(T_g))
-x_s = tf.slice(T_g, [0, 0, 0], [-1, 1, -1])
-y_s = tf.slice(T_g, [0, 1, 0], [-1, 1, -1])
-print(sess.run(tf.shape(x_s)))
-x_s_flat = tf.reshape(x_s, [-1])
-y_s_flat = tf.reshape(y_s, [-1])
-print(sess.run(tf.shape(x_s_flat)))
-print(sess.run(tf.shape(y_s_flat)))
-#print(sess.run(y_s_flat))
-input_transformed = interpolate(U,U_org, x_s_flat, y_s_flat,out_size)
-print(sess.run(tf.shape(input_transformed)))
-output = tf.reshape(input_transformed, tf.stack([1, 40, 40, 1]))
-print(sess.run(tf.shape(output)))
-
-output = tf.reshape(output,[40,40,1])
-print(sess.run(tf.shape(output)))
-output =tf.cast(output,'uint8')
-output = tf.image.encode_png(output)
-output = tf.image.decode_png(output)
-output = tf.expand_dims(output,0)
-print(sess.run(tf.shape(output)))
-#print(sess.run(output))
-sess = tf.Session()
-writer = tf.summary.FileWriter('logs')
-
-output_summary = tf.summary.image("output_image_3", output)
-merged = tf.summary.merge_all()
-summary = sess.run(merged)
-writer.add_summary(summary)
-writer.close()
-sess.close()
-'''
