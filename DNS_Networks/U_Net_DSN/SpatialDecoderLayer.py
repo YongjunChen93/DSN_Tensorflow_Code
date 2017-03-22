@@ -189,9 +189,8 @@ def TPS_decoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_con
             x_s_flat = tf.reshape(x_s, [-1])
             y_s_flat = tf.reshape(y_s, [-1])
             
-            #output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,input_size,out_size)
-            #output = output_transformed
-            output = U_org
+            output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,input_size,out_size)
+            output = output_transformed
             
             return output
 
