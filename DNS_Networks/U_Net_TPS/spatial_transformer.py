@@ -5,15 +5,15 @@ from tf_utils import weight_variable, bias_variable, dense_to_one_hot
 def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs):
     def _local_Networks(input_dim,x):
         with tf.variable_scope('_local_Networks'):
-            print("input_dim",input_dim.get_shape())
+            #print("input_dim",input_dim.get_shape())
             num_batch = tf.shape(input_dim)[0]
             height = tf.shape(input_dim)[1]
             width = tf.shape(input_dim)[2]
             num_channels = tf.shape(input_dim)[3]
             print("num_channels",num_channels.get_shape())
 
-            x = tf.reshape(x,[-1,1600*512])
-            W_fc_loc1 = weight_variable([1600*512, 20])
+            x = tf.reshape(x,[-1,1600*256])
+            W_fc_loc1 = weight_variable([1600*256, 20])
             b_fc_loc1 = bias_variable([20])
             W_fc_loc2 = weight_variable([20, 6])
             initial = np.array([[1., 0, 0], [0, 1., 0]])
@@ -22,7 +22,6 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
             b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
             h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
             h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1, W_fc_loc2) + b_fc_loc2)
-            print("h_fc_loc2",h_fc_loc2.get_shape())
             return h_fc_loc2
 
     def _repeat(x, n_repeats):
@@ -147,7 +146,7 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
                 out_size)
 
             output = tf.reshape(
-                input_transformed, tf.stack([5, out_height, out_width, 512]))
+                input_transformed, tf.stack([2, out_height, out_width, 256]))
             return output
 
     with tf.variable_scope(name):
