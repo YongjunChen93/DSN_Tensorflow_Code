@@ -1,13 +1,26 @@
 import tensorflow as tf
+import numpy as np
+from tf_utils import weight_variable, bias_variable, dense_to_one_hot
 sess = tf.Session()
-def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name='SpatialTransformer', **kwargs):
-    
+def transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_number,name='SpatialTransformer', **kwargs):
+    def _local_Networks(x):
+        with tf.variable_scope('_local_Networks'):
+            x = tf.reshape(x,[-1,1600])
+            W_fc_loc1 = weight_variable([1600, 20])
+            b_fc_loc1 = bias_variable([20])
+            W_fc_loc2 = weight_variable([20, 32])
+            initial = np.array([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5.],[-5., -5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]])
+            initial = initial.astype('float32')
+            initial = initial.flatten()
+            b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
+            h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
+            h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1, W_fc_loc2) + b_fc_loc2)
+            return h_fc_loc2
     def _makeT(cp,Column_controlP_number,Row_controlP_number):
         #with tf.variable_scape('_makeT'): 
         cp = tf.reshape(cp,(-1,2,16))
         cp = tf.cast(cp,'float32')       
-        N_f = tf.shape(cp)[0] 
-        
+        N_f = tf.shape(cp)[0]         
         #c_s
         x,y = tf.linspace(-1.,1.,Column_controlP_number),tf.linspace(-1.,1.,Row_controlP_number)
         x,y = tf.meshgrid(x,y)
@@ -171,7 +184,6 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             grid = tf.tile(grid, tf.stack([num_batch]))
             #grid = tf.reshape(grid, tf.stack([num_batch, 3, -1]))
             grid = tf.reshape(grid, tf.stack([num_batch, 19, -1]))
-
             # Transform A x (x_t, y_t, 1)^T -> (x_s, y_s)
             T_g = tf.matmul(T, grid)
             x_s = tf.slice(T_g, [0, 0, 0], [-1, 1, -1])
@@ -188,10 +200,11 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             return output
 
     with tf.variable_scope(name):
+        cp = _local_Networks(U_local)
         T= _makeT(cp,Column_controlP_number,Row_controlP_number)
+
         output = _transform(T, U, out_size,Column_controlP_number,Row_controlP_number)
         return output
-
 
 def batch_transformer(U, Ts, out_size, name='BatchSpatialTransformer'):
 

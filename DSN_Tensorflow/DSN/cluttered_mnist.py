@@ -32,48 +32,24 @@ y = tf.placeholder(tf.float32, [None, 10])
 # dimension should not change size.
 x_tensor = tf.reshape(x, [-1, 40, 40, 1])
 
-# %% We'll setup the two-layer localisation network to figure out the
-# %% parameters for an affine transformation of the input
-# %% Create variables for fully connected layer
-W_fc_loc1 = weight_variable([1600, 20])
-b_fc_loc1 = bias_variable([20])
-
-W_fc_loc2 = weight_variable([20, 32])
-
-#W_fc_loc2 = weight_variable([20, 6])
-# Use identity transformation as starting point
-#initial = np.array([[0, 1., 0], [0, 0, 1.]])
-#initial = np.array([[0.5 ,-0.1, 0.1 ,0.5, -0.5 ,-0.1, 0.1 ,0.5 ,-0.5, -0.1, 0.1, 0.5, -0.5 ,-0.1, 0.1 ,0.5],[-0.5, -0.5 ,-0.5 ,-0.5 ,-0.1, -0.1, -0.1, -0.1, 0.1, 0.1, 0.1 ,0.1, 0.5, 0.5 ,0.5,0.5]])
-initial = np.array([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5.],[-5., -5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]])
-
-initial = initial.astype('float32')
-initial = initial.flatten()
-b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
-
-# %% Define the two layer localisation network
-h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
 # %% We can add dropout for regularizing and to reduce overfitting like so:
 keep_prob = tf.placeholder(tf.float32)
-h_fc_loc1_drop = tf.nn.dropout(h_fc_loc1, keep_prob)
-# %% Second layer
-h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1_drop, W_fc_loc2) + b_fc_loc2)
-
 # %% We'll create a spatial transformer module to identify discriminative
 # %% patches
 
 out_size = (40, 40)
 Column_controlP_number = 4
 Row_controlP_number = 4
-h_trans = transformer(x_tensor, h_fc_loc2, out_size, Column_controlP_number,Row_controlP_number)
+h_trans, cp = transformer(x_tensor, x, out_size, Column_controlP_number,Row_controlP_number)
 
 #h_trans = transformer(x_tensor, h_fc_loc2, out_size)
 
-
+input_size_2 = (40,40)
 out_size_2 = (40, 40)
 Column_controlP_number_2 = 4
 Row_controlP_number_2 = 4
 
-h_trans_2 = spatialdecoder(h_trans,h_trans,h_fc_loc2,out_size_2, Column_controlP_number_2,Row_controlP_number_2)
+h_trans_2 = spatialdecoder(h_trans,h_trans,cp,input_size_2,out_size_2, Column_controlP_number_2,Row_controlP_number_2)
 # %% We'll setup the first convolutional layer
 # Weight matrix is [height x width x input_channels x output_channels]
 
@@ -129,7 +105,7 @@ cross_entropy = tf.reduce_mean(
     tf.nn.softmax_cross_entropy_with_logits(logits=y_logits,labels=y))
 opt = tf.train.AdamOptimizer()
 optimizer = opt.minimize(cross_entropy)
-grads = opt.compute_gradients(cross_entropy, [b_fc_loc2])
+grads = opt.compute_gradients(cross_entropy)
 
 # %% Monitor accuracy
 correct_prediction = tf.equal(tf.argmax(y_logits, 1), tf.argmax(y, 1))

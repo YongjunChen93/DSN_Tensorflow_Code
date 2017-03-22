@@ -1,9 +1,24 @@
 import tensorflow as tf
-def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name='SpatialTransformer', **kwargs):
-    
+import numpy as np
+from tf_utils import weight_variable, bias_variable, dense_to_one_hot
+def transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_number,name='SpatialTransformer', **kwargs):
+    def _local_Networks(x):
+        with tf.variable_scope('_local_Networks'):
+            x = tf.reshape(x,[-1,1600])
+            W_fc_loc1 = weight_variable([1600, 20])
+            b_fc_loc1 = bias_variable([20])
+            W_fc_loc2 = weight_variable([20, 32])
+            initial = np.array([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5.],[-5., -5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]])
+            initial = initial.astype('float32')
+            initial = initial.flatten()
+            b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
+            h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
+            h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1, W_fc_loc2) + b_fc_loc2)
+            return h_fc_loc2
+
     def _makeT(cp,Column_controlP_number,Row_controlP_number):
         with tf.variable_scope('_makeT'): 
-            cp = tf.reshape(cp,(-1,2,16))
+            cp = tf.reshape(cp,(-1,2,Column_controlP_number*Row_controlP_number))
             cp = tf.cast(cp,'float32')       
             N_f = tf.shape(cp)[0]             
             #c_s
@@ -30,7 +45,7 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             Deltas_inv = tf.expand_dims(Deltas_inv,0)
             Deltas_inv = tf.reshape(Deltas_inv,[-1])
             Deltas_inv_f = tf.tile(Deltas_inv,tf.stack([N_f]))
-            Deltas_inv_f = tf.reshape(Deltas_inv_f,tf.stack([N_f,19, -1]))
+            Deltas_inv_f = tf.reshape(Deltas_inv_f,tf.stack([N_f,Column_controlP_number*Row_controlP_number+3, -1]))
             cp_trans =tf.transpose(cp,perm=[0,2,1])
             zeros_f_In = tf.zeros([N_f,3,2],tf.float32)
             cp = tf.concat([cp_trans,zeros_f_In],1)
@@ -136,7 +151,7 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             height = tf.shape(input_dim)[1]
             width = tf.shape(input_dim)[2]
             num_channels = tf.shape(input_dim)[3]
-            T = tf.reshape(T, (-1, 2, 19))
+            T = tf.reshape(T, (-1, 2, Column_controlP_number*Row_controlP_number+3))
             T = tf.cast(T, 'float32')
             # grid of (x_t, y_t, 1), eq (1) in ref [1]
             height_f = tf.cast(height, 'float32')
@@ -148,7 +163,7 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             grid = tf.reshape(grid, [-1])
             grid = tf.tile(grid, tf.stack([num_batch]))
             #grid = tf.reshape(grid, tf.stack([num_batch, 3, -1]))
-            grid = tf.reshape(grid, tf.stack([num_batch, 19, -1]))
+            grid = tf.reshape(grid, tf.stack([num_batch, Column_controlP_number*Row_controlP_number+3, -1]))
             # Transform A x (x_t, y_t, 1)^T -> (x_s, y_s)
             T_g = tf.matmul(T, grid)
             x_s = tf.slice(T_g, [0, 0, 0], [-1, 1, -1])
@@ -164,9 +179,10 @@ def transformer(U, cp, out_size, Column_controlP_number,Row_controlP_number,name
             pass
 
     with tf.variable_scope(name):
+        cp = _local_Networks(U_local)
         T= _makeT(cp,Column_controlP_number,Row_controlP_number)
         output = _transform(T, U, out_size,Column_controlP_number,Row_controlP_number)
-        return output
+        return output, cp
         pass
 
 def batch_transformer(U, Ts, out_size, name='BatchSpatialTransformer'):

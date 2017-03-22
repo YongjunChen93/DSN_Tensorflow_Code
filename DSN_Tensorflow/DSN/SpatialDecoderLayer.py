@@ -1,10 +1,10 @@
 import tensorflow as tf
 sess = tf.Session()
 #h_trans_2 = spatialdecoder(h_trans,x_tensor,h_fc_loc2,out_size, Column_controlP_number,Row_controlP_number)
-def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_number,name='SpatialDecoderLayer', **kwargs):
+def spatialdecoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_controlP_number,name='SpatialDecoderLayer', **kwargs):
     def _makeT(cp,Column_controlP_number,Row_controlP_number):
         with tf.variable_scope('_makeT'):  
-            cp = tf.reshape(cp,(-1,2,16))
+            cp = tf.reshape(cp,(-1,2,Column_controlP_number*Row_controlP_number))
             cp = tf.cast(cp,'float32')       
             N_f = tf.shape(cp)[0]       
             #c_s
@@ -31,7 +31,7 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             Deltas_inv = tf.expand_dims(Deltas_inv,0)
             Deltas_inv = tf.reshape(Deltas_inv,[-1])
             Deltas_inv_f = tf.tile(Deltas_inv,tf.stack([N_f]))
-            Deltas_inv_f = tf.reshape(Deltas_inv_f,tf.stack([N_f,19, -1]))
+            Deltas_inv_f = tf.reshape(Deltas_inv_f,tf.stack([N_f,Column_controlP_number*Row_controlP_number+3, -1]))
 
             cp_trans =tf.transpose(cp,perm=[0,2,1])
             zeros_f_In = tf.zeros([N_f,3,2],tf.float32)
@@ -46,7 +46,7 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
             return tf.reshape(x, [-1])
 
-    def _triangle_interpolate(im,im_org, x, y, out_size):
+    def _triangle_interpolate(im,im_org, x, y,input_size, out_size):
         with tf.variable_scope('_interpolate'):
             # constants
             num_batch = tf.shape(im)[0]
@@ -89,7 +89,7 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             Coordinate = base_y0 + x0
             Coordinate = tf.expand_dims(Coordinate,0)
             Temp = tf.unstack(Coordinate)
-            B = tf.unstack(tf.reshape(Coordinate,[1600,len(Temp)]))
+            B = tf.unstack(tf.reshape(Coordinate,[input_size[0]*input_size[1],len(Temp)]))
             
             #get batch index
             Batch_index = []
@@ -164,13 +164,13 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             ones = tf.ones_like(x_t_flat) 
             grid = tf.concat([ones, x_t_flat, y_t_flat,R],0)
             return grid
-    def _transform(T, U, U_org,out_size,Column_controlP_number,Row_controlP_number):
+    def _transform(T, U, U_org,input_size,out_size,Column_controlP_number,Row_controlP_number):
         with tf.variable_scope('_transform'):
             num_batch = tf.shape(U)[0]
             height = tf.shape(U)[1]
             width = tf.shape(U)[2]
             num_channels = tf.shape(U)[3]
-            T = tf.reshape(T, (-1, 2, 19))
+            T = tf.reshape(T, (-1, 2, Column_controlP_number*Row_controlP_number+3))
             T = tf.cast(T, 'float32')
             # grid of (x_t, y_t, 1), eq (1) in ref [1]
             height_f = tf.cast(height, 'float32')
@@ -181,8 +181,7 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             grid = tf.expand_dims(grid, 0)
             grid = tf.reshape(grid, [-1])
             grid = tf.tile(grid, tf.stack([num_batch]))
-            #grid = tf.reshape(grid, tf.stack([num_batch, 3, -1]))
-            grid = tf.reshape(grid, tf.stack([num_batch, 19, -1]))
+            grid = tf.reshape(grid, tf.stack([num_batch, Column_controlP_number*Row_controlP_number+3, -1]))
             # Transform A x (x_t, y_t, 1)^T -> (x_s, y_s)
             T_g = tf.matmul(T, grid)
             x_s = tf.slice(T_g, [0, 0, 0], [-1, 1, -1])
@@ -190,7 +189,7 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
             x_s_flat = tf.reshape(x_s, [-1])
             y_s_flat = tf.reshape(y_s, [-1])
             
-            output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,out_size)
+            output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,input_size,out_size)
             output = output_transformed
             output = U
             
@@ -198,5 +197,5 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
 
     with tf.variable_scope(name):
         T = _makeT(cp,Column_controlP_number,Row_controlP_number)
-        output = _transform(T, U, U_org, out_size, Column_controlP_number, Row_controlP_number)
+        output = _transform(T, U, U_org, input_size,out_size, Column_controlP_number, Row_controlP_number)
         return output
