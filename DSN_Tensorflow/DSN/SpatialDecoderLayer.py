@@ -200,4 +200,3 @@ def spatialdecoder(U, U_org, cp,out_size, Column_controlP_number,Row_controlP_nu
         T = _makeT(cp,Column_controlP_number,Row_controlP_number)
         output = _transform(T, U, U_org, out_size, Column_controlP_number, Row_controlP_number)
         return output
-
