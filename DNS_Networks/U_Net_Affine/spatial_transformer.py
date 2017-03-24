@@ -1,19 +1,16 @@
 import tensorflow as tf
 import numpy as np
 from tf_utils import weight_variable, bias_variable, dense_to_one_hot
-
-def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs):
+def Affine_transformer(U, U_local, name='SpatialTransformer', **kwargs):
     def _local_Networks(input_dim,x):
         with tf.variable_scope('_local_Networks'):
-            print("input_dim",input_dim.get_shape())
-            num_batch = tf.shape(input_dim)[0]
-            height = tf.shape(input_dim)[1]
-            width = tf.shape(input_dim)[2]
-            num_channels = tf.shape(input_dim)[3]
-            print("num_channels",num_channels.get_shape())
+            num_batch = input_dim.shape[0].value
+            height = input_dim.shape[1].value
+            width = input_dim.shape[2].value
+            num_channels = input_dim.shape[3].value
 
-            x = tf.reshape(x,[-1,1600*512])
-            W_fc_loc1 = weight_variable([1600*512, 20])
+            x = tf.reshape(x,[-1,height*width*num_channels])
+            W_fc_loc1 = weight_variable([height*width*num_channels, 20])
             b_fc_loc1 = bias_variable([20])
             W_fc_loc2 = weight_variable([20, 6])
             initial = np.array([[1., 0, 0], [0, 1., 0]])
@@ -22,7 +19,6 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
             b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
             h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
             h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1, W_fc_loc2) + b_fc_loc2)
-            print("h_fc_loc2",h_fc_loc2.get_shape())
             return h_fc_loc2
 
     def _repeat(x, n_repeats):
@@ -33,20 +29,22 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
             x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
             return tf.reshape(x, [-1])
 
-    def _interpolate(im, x, y, out_size):
+    def _interpolate(im, x, y):
         with tf.variable_scope('_interpolate'):
             # constants
-            num_batch = tf.shape(im)[0]
-            height = tf.shape(im)[1]
-            width = tf.shape(im)[2]
-            channels = tf.shape(im)[3]
+            num_batch = im.shape[0].value
+            height = im.shape[1].value
+            width = im.shape[2].value
+            channels = im.shape[3].value
 
             x = tf.cast(x, 'float32')
             y = tf.cast(y, 'float32')
             height_f = tf.cast(height, 'float32')
             width_f = tf.cast(width, 'float32')
-            out_height = out_size[0]
-            out_width = out_size[1]
+            #out_height = out_size[0]
+            #out_width = out_size[1]
+            out_height = height
+            out_width = width
             zero = tf.zeros([], dtype='int32')
             max_y = tf.cast(tf.shape(im)[1] - 1, 'int32')
             max_x = tf.cast(tf.shape(im)[2] - 1, 'int32')
@@ -115,21 +113,19 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
             grid = tf.concat([x_t_flat, y_t_flat, ones],0)
             return grid
 
-    def _transform(theta, input_dim, out_size):
+    def _transform(theta, input_dim):
         with tf.variable_scope('_transform'):
-            num_batch = tf.shape(input_dim)[0]
-            height = tf.shape(input_dim)[1]
-            width = tf.shape(input_dim)[2]
-            num_channels = tf.shape(input_dim)[3]
+            num_batch = input_dim.shape[0].value 
+            height = input_dim.shape[1].value 
+            width = input_dim.shape[2].value 
+            num_channels = input_dim.shape[3].value 
             theta = tf.reshape(theta, (-1, 2, 3))
             theta = tf.cast(theta, 'float32')
 
             # grid of (x_t, y_t, 1), eq (1) in ref [1]
-            height_f = tf.cast(height, 'float32')
-            width_f = tf.cast(width, 'float32')
-            out_height = out_size[0]
-            out_width = out_size[1]
-            grid = _meshgrid(out_height, out_width)
+            out_height = height
+            out_width = width
+            grid = _meshgrid(height, width)
             grid = tf.expand_dims(grid, 0)
             grid = tf.reshape(grid, [-1])
             grid = tf.tile(grid, tf.stack([num_batch]))
@@ -143,32 +139,20 @@ def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs
             y_s_flat = tf.reshape(y_s, [-1])
 
             input_transformed = _interpolate(
-                input_dim, x_s_flat, y_s_flat,
-                out_size)
+                input_dim, x_s_flat, y_s_flat)
 
             output = tf.reshape(
-                input_transformed, tf.stack([5, out_height, out_width, 512]))
+                input_transformed, tf.stack([num_batch, out_height, out_width, num_channels]))
             return output
 
     with tf.variable_scope(name):
         theta = _local_Networks(U,U_local)
-        output = _transform(theta, U, out_size)
+        output = _transform(theta, U)
         return output
 
 
 def batch_transformer(U, thetas, out_size, name='BatchSpatialTransformer'):
-    """Batch Spatial Transformer Layer
-    Parameters
-    ----------
-    U : float
-        tensor of inputs [num_batch,height,width,num_channels]
-    thetas : float
-        a set of transformations for each input [num_batch,num_transforms,6]
-    out_size : int
-        the size of the output [out_height,out_width]
-    Returns: float
-        Tensor of size [num_batch*num_transforms,out_height,out_width,num_channels]
-    """
+
     with tf.variable_scope(name):
         num_batch, num_transforms = map(int, thetas.get_shape().as_list()[:2])
         indices = [[i]*num_transforms for i in xrange(num_batch)]

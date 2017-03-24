@@ -4,14 +4,12 @@ from TPS_transformer import TPS_transformer
 from SpatialDecoderLayer import TPS_decoder
 from ops import *
 from Data_generator import *
-
 class Unet(object):
     def __init__(self, sess, conf):
         self.sess = sess
         self.conf = conf
         self.conv_kernel_size = (3,3)
         self.pool_kernel_size = (2,2)
-        self.affine_out_size = (40,40)
         self.insertaffine = 3
         if conf.use_gpu:
             self.data_format = 'NCHW'
@@ -32,10 +30,10 @@ class Unet(object):
         self.label = tf.placeholder(tf.float32,self.output_shape, 'label')
         self.test_label = tf.placeholder(tf.float32,self.test_output_shape, 'test_outputs')
         self.build_network()
-        #self.build_test()
+        self.build_test()
         self.train_acc = self.get_accuracy(self.label,self.train_predict,'train')
-        #self.test_acc = self.get_accuracy(tlabel = self.test_label, plabel = self.test_predict, scope='test')
-        #self.test_acc_summary = tf.summary.scalar('test_acc', self.test_acc)
+        self.test_acc = self.get_accuracy(tlabel = self.test_label, plabel = self.test_predict, scope='test')
+        self.test_acc_summary = tf.summary.scalar('test_acc', self.test_acc)
         self.train_acc_summary = tf.summary.scalar('train_acc', self.train_acc)
         trainable_vars = tf.trainable_variables()
         self.saver = tf.train.Saver(var_list=trainable_vars, max_to_keep=0)
@@ -46,6 +44,7 @@ class Unet(object):
 
     def build_network(self):
         outputs = self.inputs
+
         down_outputs = []
         for layer_index in range(self.conf.network_depth-1):
             is_first = True if not layer_index else False
@@ -54,16 +53,20 @@ class Unet(object):
                 outputs = self.construct_down_block(outputs, name, down_outputs, first=is_first,Affine = True)
             else:
                 outputs = self.construct_down_block(outputs, name, down_outputs, first=is_first,Affine = False)
-            print("down ",layer_index," shape ", outputs.get_shape())
+            #print("down ",layer_index," shape ", outputs.get_shape())
         outputs = self.construct_bottom_block(outputs, 'bottom')
-        print("bottom shape",outputs.get_shape())
+        #print("bottom shape",outputs.get_shape())
         for layer_index in range(self.conf.network_depth-2, -1, -1):
             is_final = True if layer_index==0 else False
             name = 'up%s' % layer_index
             down_inputs = down_outputs[layer_index]
             outputs = self.construct_up_block(outputs, down_inputs, name, final=is_final)
-            print("up ",layer_index," shape ",outputs.get_shape())
+            #print("up ",layer_index," shape ",outputs.get_shape())
+
         self.train_predict = outputs
+        print("train_image_shape",outputs.get_shape())
+        outputs_for_train_image = tf.slice(outputs,[0,0,0,0],[-1,-1,-1,1])
+        self.save_train_image = tf.summary.image('train_image', outputs_for_train_image,max_outputs=100)
         self.loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = self.label, logits = outputs))
         self.loss_summary = tf.summary.scalar('loss', self.loss_op)
 
@@ -72,8 +75,8 @@ class Unet(object):
         conv1 = conv2d(inputs, num_outputs,self.conv_kernel_size,name+'/conv1',self.data_format)
         if Affine == True:
             #pass
-            conv1 = Affine_transformer(conv1,conv1,self.affine_out_size)
-            print(conv1.get_shape())
+            conv1 = Affine_transformer(conv1,conv1)
+            #print(conv1.get_shape())
         conv2 = conv2d(conv1, num_outputs, self.conv_kernel_size,name+'/conv2',self.data_format)
         down_outputs.append(conv2)
         pool = pool2d(conv2,self.pool_kernel_size,name+'/pool',self.data_format)
@@ -120,20 +123,24 @@ class Unet(object):
         test_generator = data_generator.valid_generator(self.conf.test_batch)
         train_step = tf.train.AdamOptimizer(self.conf.learning_rate).minimize(self.loss_op)
         self.merged_train = tf.summary.merge([self.train_acc_summary,self.loss_summary])
-        #self.merged_test = tf.summary.merge([self.test_acc_summary])
+        self.merged_train_with_image = tf.summary.merge([self.train_acc_summary,self.loss_summary,self.save_train_image])
+        self.merged_test = tf.summary.merge([self.test_acc_summary])
         self.train_writer = tf.summary.FileWriter(self.conf.log_dir + '/train', self.sess.graph)
         self.test_writer = tf.summary.FileWriter(self.conf.log_dir + '/test')
         self.sess.run(tf.global_variables_initializer())
         for iter_num in range(1,self.conf.max_epoch+1):
             image,label = next(train_generator)
-            summary, loss,  acc_train, _ = self.sess.run([self.merged_train, self.loss_op, self.train_acc, train_step],feed_dict={self.inputs: image,self.label: label})
+            #if iter_num == self.conf.start_save_train_image:
+            summary, loss,  acc_train, _ = self.sess.run([self.merged_train_with_image, self.loss_op, self.train_acc, train_step],feed_dict={self.inputs: image,self.label: label})
+            #else:
+            #    summary, loss,  acc_train, _ = self.sess.run([self.merged_train, self.loss_op, self.train_acc, train_step],feed_dict={self.inputs: image,self.label: label})   
             self.train_writer.add_summary(summary, iter_num)
             print("Epoch: [%2d],   loss = %.8f ,  accuracy = %.8f " %(iter_num,loss,acc_train))
             if iter_num % self.conf.save_step == 0:
                 self.save(iter_num)
             if iter_num % self.conf.test_step == 0:
                 pass
-         #       self.test(self.conf.batch,test_generator,iter_num)
+                self.test(self.conf.batch,test_generator,iter_num)
         self.train_writer.close()
         self.test_writer.close()
 

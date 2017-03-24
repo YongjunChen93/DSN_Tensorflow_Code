@@ -7,11 +7,12 @@ def configure():
     # training
     flags = tf.app.flags
     flags.DEFINE_integer('max_epoch', 20000, '# of step in an epoch')
-    flags.DEFINE_integer('test_step', 10000, '# of step to test a model')
+    flags.DEFINE_integer('test_step', 10, '# of step to test a model')
+    flags.DEFINE_integer('start_save_train_image', 1, '# of step to save train image')
     flags.DEFINE_integer('save_step', 2000, '# of step to save a model')
     flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
     # data
-    flags.DEFINE_integer('batch', 5, 'batch size')
+    flags.DEFINE_integer('batch', 4, 'batch size')
     flags.DEFINE_integer('test_batch', 1, 'batch size')
     flags.DEFINE_integer('channel', 1, 'channel size')
     flags.DEFINE_integer('height', 320, 'height size')
