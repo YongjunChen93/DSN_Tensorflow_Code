@@ -77,6 +77,8 @@ class Unet(object):
             outputs = self.construct_up_block(outputs, down_inputs, name, cp, final=is_final, Decoder = Decoder)
             print("up ",layer_index," shape ",outputs.get_shape())
         self.train_predict = outputs
+        outputs_for_train_image = tf.slice(outputs,[0,0,0,0],[-1,-1,-1,1])
+        self.save_train_image = tf.summary.image('train_image', outputs_for_train_image,max_outputs=100)
         self.loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = self.label, logits = outputs))
         self.loss_summary = tf.summary.scalar('loss', self.loss_op)
 
@@ -138,13 +140,14 @@ class Unet(object):
         test_generator = data_generator.valid_generator(self.conf.test_batch)
         train_step = tf.train.AdamOptimizer(self.conf.learning_rate).minimize(self.loss_op)
         self.merged_train = tf.summary.merge([self.train_acc_summary,self.loss_summary])
+        self.merged_train_with_image = tf.summary.merge([self.train_acc_summary,self.loss_summary,self.save_train_image])
         #self.merged_test = tf.summary.merge([self.test_acc_summary])
         self.train_writer = tf.summary.FileWriter(self.conf.log_dir + '/train', self.sess.graph)
         self.test_writer = tf.summary.FileWriter(self.conf.log_dir + '/test')
         self.sess.run(tf.global_variables_initializer())
         for iter_num in range(1,self.conf.max_epoch+1):
             image,label = next(train_generator)
-            summary, loss,  acc_train, _ = self.sess.run([self.merged_train, self.loss_op, self.train_acc, train_step],feed_dict={self.inputs: image,self.label: label})
+            summary, loss,  acc_train, _ = self.sess.run([self.merged_train_with_image, self.loss_op, self.train_acc, train_step],feed_dict={self.inputs: image,self.label: label})
             self.train_writer.add_summary(summary, iter_num)
             print("Epoch: [%2d],   loss = %.8f ,  accuracy = %.8f " %(iter_num,loss,acc_train))
             if iter_num % self.conf.save_step == 0:

@@ -7,7 +7,7 @@ def configure():
     # training
     flags = tf.app.flags
     flags.DEFINE_integer('max_epoch', 20000, '# of step in an epoch')
-    flags.DEFINE_integer('test_step', 10000, '# of step to test a model')
+    flags.DEFINE_integer('test_step', 10, '# of step to test a model')
     flags.DEFINE_integer('save_step', 2000, '# of step to save a model')
     flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
     # data
