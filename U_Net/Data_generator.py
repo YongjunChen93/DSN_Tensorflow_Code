@@ -13,7 +13,7 @@ class Data_generator:
     def __init__(self,patch_shape,data_format):
         self.patch_shape = patch_shape
         self.data_format = data_format
-        self.data_dir = '/Users/lei.cai/'
+        self.data_dir = '../data/'
         #self.data_dir = '/tempspace/tzeng/snmes3d/data/'
         
     def train_generator(self):
@@ -85,8 +85,6 @@ class Data_generator:
         h_input = data.shape[0]
         w_input = data.shape[1]
         s_input = data.shape[2]
-
-
 
         while True:
             w_start = 0

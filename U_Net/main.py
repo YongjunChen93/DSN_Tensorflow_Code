@@ -3,20 +3,19 @@ import time
 import tensorflow as tf
 from network_bn import *
 
-
 def configure():
     # training
     flags = tf.app.flags
-    flags.DEFINE_integer('max_epoch', 20, '# of step in an epoch')
+    flags.DEFINE_integer('max_epoch', 20000, '# of step in an epoch')
     flags.DEFINE_integer('test_step', 10, '# of step to test a model')
-    flags.DEFINE_integer('save_step', 20000, '# of step to save a model')
+    flags.DEFINE_integer('save_step', 2000, '# of step to save a model')
     flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
     # data
-    flags.DEFINE_integer('batch', 5, 'batch size')
+    flags.DEFINE_integer('batch', 2, 'batch size')
     flags.DEFINE_integer('test_batch', 1, 'batch size')
     flags.DEFINE_integer('channel', 1, 'channel size')
-    flags.DEFINE_integer('height', 256, 'height size')
-    flags.DEFINE_integer('width', 256, 'width size')
+    flags.DEFINE_integer('height', 320, 'height size')
+    flags.DEFINE_integer('width', 320, 'width size')
     # Debug
     flags.DEFINE_string('model_name', 'model', 'Model file name')
     flags.DEFINE_string('log_dir','log','log directory')
@@ -32,11 +31,10 @@ def configure():
     flags.FLAGS.__dict__['__parsed'] = False
     return flags.FLAGS
 
-
 def main(_):
     conf = configure()
     sess = tf.Session()
-    model = GAN(sess, conf)
+    model = Unet(sess, conf)
     model.train()
 
 
