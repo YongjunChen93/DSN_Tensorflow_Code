@@ -5,7 +5,6 @@ from tf_utils import weight_variable, bias_variable, dense_to_one_hot
 def Affine_transformer(U, U_local, out_size, name='SpatialTransformer', **kwargs):
     def _local_Networks(input_dim,x):
         with tf.variable_scope('_local_Networks'):
-            #print("input_dim",input_dim.get_shape())
             num_batch = tf.shape(input_dim)[0]
             height = tf.shape(input_dim)[1]
             width = tf.shape(input_dim)[2]
