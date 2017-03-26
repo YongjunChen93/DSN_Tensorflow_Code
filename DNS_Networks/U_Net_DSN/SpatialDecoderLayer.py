@@ -80,7 +80,7 @@ def TPS_decoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_con
             base = _repeat(tf.range(channels)*dim1, out_height*out_width)
             base = tf.tile(base,tf.stack([num_batch]))
             base_y0 = base + y0*dim2
-            #idx_a = base_y0 + x0
+    #idx_a = base_y0 + x0
             #idx_b = base_y1 + x0
             #idx_c = base_y0 + x1
             #idx_d = base_y1 + x1
@@ -96,7 +96,6 @@ def TPS_decoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_con
             Batch_index = tf.cast(Batch_index,tf.int32)
             Batch_index = tf.unstack(Batch_index)
             Be_insert = tf.unstack(Batch_index)
-
             for Batch_size in range(height*width*channels-1):
                 for index in range(len(Be_insert), 0, -1):
                     Batch_index.insert(index*(Batch_size+1), Be_insert[index-1])    
@@ -196,10 +195,10 @@ def TPS_decoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_con
             y_s_flat = tf.reshape(y_s, [-1])
             output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,input_size,out_size)
             output = tf.reshape(output_transformed, tf.stack([num_batch, out_height, out_width, num_channels]))
-            output = U_org
             return output
 
     with tf.variable_scope(name):
+        print("decoder_input_shape",U.get_shape())
         T = _makeT(cp,Column_controlP_number,Row_controlP_number)
         output = _transform(T, U, U_org, input_size,out_size, Column_controlP_number, Row_controlP_number)
         return output

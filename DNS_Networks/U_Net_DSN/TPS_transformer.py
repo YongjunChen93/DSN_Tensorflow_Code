@@ -1,16 +1,15 @@
 import tensorflow as tf
 import numpy as np
 from tf_utils import weight_variable, bias_variable, dense_to_one_hot
-def TPS_transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_number,name='SpatialTransformer', **kwargs):
+def TPS_transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_number,name='TPS_transformer', **kwargs):
     def _local_Networks(input_dim,x):
         with tf.variable_scope('_local_Networks'):
-            
+	               
             num_batch = input_dim.shape[0].value
             height = input_dim.shape[1].value
             width = input_dim.shape[2].value
             num_channels = input_dim.shape[3].value
             x = tf.reshape(x,[-1,height*width*num_channels])
-            print("input_dim",x.get_shape())
             W_fc_loc1 = weight_variable([height*width*num_channels, 20])
             b_fc_loc1 = bias_variable([20])
             W_fc_loc2 = weight_variable([20, 32])
@@ -19,9 +18,7 @@ def TPS_transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_nu
             initial = initial.flatten()
             b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
             h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
-            print("test")
             h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1, W_fc_loc2) + b_fc_loc2)
-            print("h_fc_loc2",h_fc_loc2.get_shape())
             return h_fc_loc2
 
     def _makeT(cp,Column_controlP_number,Row_controlP_number):
@@ -188,10 +185,10 @@ def TPS_transformer(U, U_local, out_size, Column_controlP_number,Row_controlP_nu
             pass
 
     with tf.variable_scope(name):
+        print("TPS_input_shape",U.get_shape())
         cp = _local_Networks(U,U_local)
         T= _makeT(cp,Column_controlP_number,Row_controlP_number)
         output = _transform(T, U, out_size,Column_controlP_number,Row_controlP_number)
-        print("shape of TPS",output.get_shape())
         return output,cp
         pass
 

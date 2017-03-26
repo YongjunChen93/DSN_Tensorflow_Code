@@ -15,7 +15,7 @@ class Unet(object):
         self.Column_controlP_number = 4
         self.Row_controlP_number = 4
         self.inserttps = 3
-        self.insertdecoder = 2
+        self.insertdecoder = 3
         self.input_size_D = (40, 40)
         self.out_size_D = (40, 40)
         self.Column_controlP_number_D = 4
@@ -75,7 +75,6 @@ class Unet(object):
             else:
                 Decoder = False
                 cp = []
-            print("up",layer_index,"shape",outputs.get_shape())
             outputs = self.construct_up_block(outputs, down_inputs, name, cp, final=is_final, Decoder = Decoder)
             print("up ",layer_index," shape ",outputs.get_shape())
         self.train_predict = outputs
@@ -100,20 +99,16 @@ class Unet(object):
     def construct_bottom_block(self, inputs, name):
         num_outputs = inputs.shape[self.channel_axis].value
         conv1 = conv2d(inputs, 2*num_outputs, self.conv_kernel_size, name+'/conv1', self.data_format)
-        
-
         conv2 = conv2d(conv1, num_outputs,self.conv_kernel_size,name+'/conv2',self.data_format)
         return conv2
 
     def construct_up_block(self, inputs, down_inputs, name, cp, final = False,Decoder=False):
         num_outputs = inputs.shape[self.channel_axis].value
         conv1 = deconv2d(inputs,num_outputs,self.conv_kernel_size,name+'/conv1',self.data_format)
-        print("conv1_shape",conv1.get_shape())
         conv1 = tf.concat([conv1, down_inputs],self.channel_axis,name=name+'/concat')
-        print("conv1_concat_shape",conv1.get_shape())
         conv2 = conv2d(conv1,num_outputs,self.conv_kernel_size,name+'/conv2',self.data_format)
         if Decoder == True:
-        conv1 = TPS_decoder(conv1,conv1,cp,self.input_size_D,self.out_size_D, self.Column_controlP_number_D,self.Row_controlP_number_D)
+            conv2 = TPS_decoder(conv2,conv2,cp,self.input_size_D,self.out_size_D, self.Column_controlP_number_D,self.Row_controlP_number_D)
 
         num_outputs = self.conf.class_num if final else num_outputs/2
         conv3 = conv2d(conv2, num_outputs, self.conv_kernel_size, name+'/conv3',self.data_format)

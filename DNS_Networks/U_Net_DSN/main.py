@@ -14,8 +14,8 @@ def configure():
     flags.DEFINE_integer('batch', 2, 'batch size')
     flags.DEFINE_integer('test_batch', 1, 'batch size')
     flags.DEFINE_integer('channel', 1, 'channel size')
-    flags.DEFINE_integer('height', 320, 'height size')
-    flags.DEFINE_integer('width', 320, 'width size')
+    flags.DEFINE_integer('height', 224, 'height size')
+    flags.DEFINE_integer('width', 224, 'width size')
     # Debug
     flags.DEFINE_string('model_name', 'model', 'Model file name')
     flags.DEFINE_string('log_dir','log','log directory')
@@ -26,7 +26,7 @@ def configure():
     # network
     flags.DEFINE_integer('network_depth', 5, 'network depth for U-Net')
     flags.DEFINE_integer('class_num', 2, 'output class number')
-    flags.DEFINE_integer('start_channel_num', 64, 'start number of outputs')
+    flags.DEFINE_integer('start_channel_num', 8, 'start number of outputs')
     flags.DEFINE_boolean('use_gpu', False, 'use GPU or not')
     flags.FLAGS.__dict__['__parsed'] = False
     return flags.FLAGS
@@ -39,5 +39,5 @@ def main(_):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '6'
     tf.app.run()
