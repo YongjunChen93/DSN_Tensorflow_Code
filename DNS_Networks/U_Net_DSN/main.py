@@ -8,9 +8,9 @@ def configure():
     # training
     flags = tf.app.flags
     flags.DEFINE_integer('max_epoch', 20000, '# of step in an epoch')
-    flags.DEFINE_integer('test_step', 1, '# of step to test a model')
-    flags.DEFINE_integer('save_step', 1000, '# of step to save a model')
-    flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
+    flags.DEFINE_integer('test_step', 100, '# of step to test a model')
+    flags.DEFINE_integer('save_step', 100, '# of step to save a model')
+    flags.DEFINE_float('learning_rate', 1e-2, 'learning rate')
     # data
     flags.DEFINE_integer('batch', 2, 'batch size')
     flags.DEFINE_integer('test_batch', 10, 'batch size')
@@ -48,8 +48,8 @@ def main(_):
             conf.reload_step = conf.reload_step + conf.reload_stride
         os.system("matlab -r 'run Afterprediction.m'")        
     end = time.clock()
-    print((end-start)/60)
+    print("program total running time",(end-start)/60)
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '8'
     tf.app.run()
