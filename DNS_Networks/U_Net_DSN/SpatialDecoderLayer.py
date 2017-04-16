@@ -64,7 +64,6 @@ def TPS_decoder(U, U_org, cp,input_size,out_size, Column_controlP_number,Row_con
             _,C = tf.split(Left,[1,height-1],1)
             _,D = tf.split(Right,[1,height-1],1)
             return A,B,C,D   
-                         
     def _triangle_interpolate(im,im_org, x, y,input_size, out_size):
         with tf.variable_scope('_triangle_interpolate'):
             # constants
