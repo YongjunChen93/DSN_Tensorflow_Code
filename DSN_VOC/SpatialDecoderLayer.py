@@ -1,6 +1,7 @@
 import tensorflow as tf
 import time
 import datetime
+sess = tf.Session()
 def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_controlP_number,name='SpatialDecoderLayer', **kwargs):
     def _repeat(x, n_repeats):
         with tf.variable_scope('_repeat'):
@@ -86,7 +87,7 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                 coordy = tf.cast(tf.reshape(Py,[-1]),'int32')
                 dim2 = width
                 dim1 = width*height
-                Base = _repeat(tf.range(channels)*dim1, (out_height)*(out_width))
+                Base = tf.tile(tf.range(channels)*dim1, [(out_height)*(out_width)])
                 Base = tf.tile(Base,tf.stack([num_batch]))
                 Base = tf.reshape(Base,[num_batch,height,width,channels])
                 Base,_,_,_ = _split_input(Base,height,width)
@@ -109,7 +110,7 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                 #Value from U
                 Value_final=tf.reshape(Value_final,[num_batch*(height-1)*(width-1)*channels])
                 sparse_values=tf.SparseTensor(indices=Index, values=Value_final, dense_shape=[num_batch,height*width*channels])
-                Value_from_U=tf.sparse_tensor_to_dense(sp_input=sparse_values,default_value=-10,validate_indices=False)
+                Value_from_U=tf.sparse_tensor_to_dense(sp_input=sparse_values,default_value=0,validate_indices=False)
                 Value_from_U=tf.cast(Value_from_U,'float32')
                 #weights
                 thred=tf.subtract(tf.ones_like(Value_from_U,'float32'),8)
@@ -122,10 +123,10 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                 gap_x = tf.cast(gap_x,'int32')
                 gap_y = tf.cast(gap_y,'int32')
             #Weights=tf.cast(Weights,'float32')
-            Value_from_U_final = Value_from_U_final/Weights
-            Thred=tf.subtract(tf.ones_like(Value_from_U_final,'float32'),8)
+            Value_from_U_final = tf.clip_by_value(Value_from_U_final/Weights,0,1e+10)
+            Thred=tf.zeros_like(Value_from_U_final,'float32')
             #Check which state is selected
-            S_o_r_bool=tf.Tensor.__ge__(Value_from_U_final,Thred)
+            S_o_r_bool=tf.Tensor.__gt__(Value_from_U_final,Thred)
             S_o_r_value=tf.cast(S_o_r_bool,tf.float32)
             S_o_r_value=tf.subtract(tf.ones_like(S_o_r_value),S_o_r_value)
             #Value from im_org
@@ -133,10 +134,8 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             im_org=tf.reshape(im_org,[b_org,-1])
             im_org = tf.cast(im_org,'float32')
             Value_from_im_org = tf.multiply(S_o_r_value,im_org) 
-            #Use to offset the thred value
-            Equal_to_thred=tf.multiply(S_o_r_value,10) 
             #Ouput value
-            output = tf.add(tf.add(Value_from_U_final,Value_from_im_org),Equal_to_thred)
+            output =tf.add(Value_from_U_final,Value_from_im_org)
             return output
     def _meshgrid(U,height, width,Column_controlP_number,Row_controlP_number):
         with tf.variable_scope('_meshgrid'):
@@ -207,6 +206,7 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
     with tf.variable_scope(name):
         output = _transform(T, U, U_org, input_size,out_size, Column_controlP_number, Row_controlP_number)
         return output
+
 
 
 
