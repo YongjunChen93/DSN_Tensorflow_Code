@@ -113,8 +113,8 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                 Value_from_U=tf.sparse_tensor_to_dense(sp_input=sparse_values,default_value=0,validate_indices=False)
                 Value_from_U=tf.cast(Value_from_U,'float32')
                 #weights
-                thred=tf.subtract(tf.ones_like(Value_from_U,'float32'),8)
-                weights=tf.Tensor.__ge__(Value_from_U,thred)
+                thred=tf.zeros_like(Value_from_U_final,'float32')
+                weights=tf.Tensor.__gt__(Value_from_U,thred)
                 weights=tf.cast(weights,tf.float32)
                 Weights += weights
                 Value_from_U_final+=Value_from_U
