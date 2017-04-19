@@ -123,7 +123,8 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                 gap_x = tf.cast(gap_x,'int32')
                 gap_y = tf.cast(gap_y,'int32')
             #Weights=tf.cast(Weights,'float32')
-            Value_from_U_final = tf.clip_by_value(Value_from_U_final/Weights,0,1e+10)
+            Weights = tf.clip_by_value(Weights,1e-10,1e+10)
+            Value_from_U_final = Value_from_U_final/Weights
             Thred=tf.zeros_like(Value_from_U_final,'float32')
             #Check which state is selected
             S_o_r_bool=tf.Tensor.__gt__(Value_from_U_final,Thred)
