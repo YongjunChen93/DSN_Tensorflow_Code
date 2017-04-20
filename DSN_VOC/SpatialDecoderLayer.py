@@ -3,11 +3,11 @@ import time
 import datetime
 sess = tf.Session()
 def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_controlP_number,name='SpatialDecoderLayer', **kwargs):
-    def _repeat(x, n_repeats):
+    def _repeat(x, n_repeats, type):
         with tf.variable_scope('_repeat'):
             rep = tf.transpose(
                 tf.expand_dims(tf.ones(shape=tf.stack([n_repeats, ])), 1), [1, 0])
-            rep = tf.cast(rep, 'float32')
+            rep = tf.cast(rep, type)
             x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
             return tf.reshape(x, [-1])
     def _triange_function(Px,Py,Ax,Ay,Bx,By,Cx,Cy,A_U,B_U,C_U):
@@ -34,6 +34,7 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             #print("im",sess.run(im))
             #print("im_org",sess.run(im_org))
             # constants
+            print("x",sess.run(x))
             num_batch = im.shape[0].value
             height = im.shape[1].value
             width = im.shape[2].value
@@ -53,17 +54,13 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             y = (y + 1.0)*(height_f) / 2.0
             X = tf.reshape(x,[num_batch,height,width,channels])
             Y = tf.reshape(y,[num_batch,height,width,channels])
-            #print("X",sess.run(X))
-            #print("Xshape",sess.run(tf.shape(X)))
             # get A B C D coordinate
             Ax,Bx,Cx,Dx = _split_input(X,width,height)
             Ay,By,Cy,Dy = _split_input(Y,width,height)
-            #print("Ax",sess.run(Ax))
-            #print("Ax_shape",sess.run(tf.shape(Ax)))
             # get min coordinate
             Min_X = tf.minimum(tf.minimum(Ax,Bx),tf.minimum(Cx,Dx))
             Min_Y = tf.minimum(tf.minimum(Ay,By),tf.minimum(Cy,Dy))
-            #print("Min_X",sess.run(Min_X))
+
             #get max coordinate
             Max_X = tf.maximum(tf.maximum(Ax,Bx),tf.maximum(Cx,Dx))
             Max_Y = tf.maximum(tf.maximum(Ay,By),tf.maximum(Cy,Dy))
@@ -71,87 +68,88 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             Py_min = tf.cast(tf.minimum(tf.maximum(tf.ceil(Min_Y),0),height-1),'int32')
             Px_max = tf.cast(tf.maximum(tf.minimum(tf.floor(Max_X),width-1),0),'int32')
             Py_max = tf.cast(tf.maximum(tf.minimum(tf.floor(Max_Y),width-1),0),'int32')
-            PX = Px_min
-            PY = Py_min
-            #print("Px",sess.run(PX))
-            #print("PX",sess.run(PX))
-            #print("PX",sess.run(tf.shape(PX)))
+
             #final Value from U
             Value_from_U_final = tf.zeros([num_batch,height*width*channels])
             Value_from_U_final = tf.cast(Value_from_U_final,'float32')
             Weights = tf.zeros([num_batch,height*width*channels])
+            PX = Px_min
             gap_x = tf.zeros_like(PX)
-            gap_y = tf.zeros_like(PY)
             for i in range(4):
                 PX = PX + gap_x
-                PY = PY + gap_y
                 Px = tf.cast(PX,'float32')
-                Py = tf.cast(PY,'float32')
-                Value_ABC,weight_ABC = _triange_function(Px,Py,Ax,Ay,Bx,By,Cx,Cy,A_U,B_U,C_U)
-                Value_BCD,weight_BCD = _triange_function(Px,Py,Dx,Dy,Bx,By,Cx,Cy,D_U,B_U,C_U)
-                Value_ACD,weight_ACD = _triange_function(Px,Py,Ax,Ay,Dx,Dy,Cx,Cy,A_U,D_U,C_U)
-                Value_ABD,weight_ABD = _triange_function(Px,Py,Ax,Ay,Bx,By,Dx,Dy,A_U,B_U,D_U)
-                Weight_all = tf.clip_by_value(weight_ABC + weight_BCD + weight_ACD + weight_ABD,0.001,1e+10)
-                Value_final =  (Value_ABC+Value_BCD + Value_ACD + Value_ABD)/Weight_all
-                #print("Value_final",sess.run(Value_final))
-                #print("Value_final_shape",sess.run(tf.shape(Value_final)))
-                coordx= tf.cast(tf.reshape(Px,[-1]),'int32')
-                coordy = tf.cast(tf.reshape(Py,[-1]),'int32')
+                PY = Py_min
+                gap_y = tf.zeros_like(PY)
+                for j in range(4):
+                    PY = PY + gap_y
+                    Py = tf.cast(PY,'float32')
+                    Value_ABC,weight_ABC = _triange_function(Px,Py,Ax,Ay,Bx,By,Cx,Cy,A_U,B_U,C_U)
+                    Value_BCD,weight_BCD = _triange_function(Px,Py,Dx,Dy,Bx,By,Cx,Cy,D_U,B_U,C_U)
+                    Value_ACD,weight_ACD = _triange_function(Px,Py,Ax,Ay,Dx,Dy,Cx,Cy,A_U,D_U,C_U)
+                    Value_ABD,weight_ABD = _triange_function(Px,Py,Ax,Ay,Bx,By,Dx,Dy,A_U,B_U,D_U)
+                    Weight_all = tf.clip_by_value(weight_ABC + weight_BCD + weight_ACD + weight_ABD,0.001,1e+10)
+                    Value_final =  (Value_ABC+Value_BCD + Value_ACD + Value_ABD)/Weight_all
+                    coordx= tf.cast(tf.reshape(Px,[-1]),'int32')
+                    coordy = tf.cast(tf.reshape(Py,[-1]),'int32')
 
-                dim2 = width
-                dim1 = width*height
-                Base = tf.tile(tf.range(channels)*dim1, [(out_height)*(out_width)])
-                Base = tf.tile(Base,tf.stack([num_batch]))
-                Base = tf.reshape(Base,[num_batch,height,width,channels])
-                Base,_,_,_ = _split_input(Base,height,width)
-                #print("Base2",sess.run(tf.shape(Base)))
-                #print("Base3",sess.run(Base))
-                #base = tf.transpose(Base)
-                #print("base",sess.run(base))
-                Base = tf.reshape(Base,[-1])
-                #print("Base reshape",sess.run(Base))
-                #print("base shape",sess.run(tf.shape(Base)))
-                Base_Y = Base + coordy*dim2
-                #print("Base_Y",sess.run(Base_Y))
-                coordinate = Base_Y + coordx
-                #print("coordinate",sess.run(coordinate))
-                coordinate = tf.expand_dims(coordinate,0)
-
-                #print("coordinate",sess.run(coordinate))
-                #print("coordinate",sess.run(tf.shape(coordinate)))
-                #get batch index
-                batch_index = []
-                for i in range(num_batch):
-                    batch_index.append(i)
-                batch_index = tf.transpose(tf.expand_dims(tf.stack(batch_index),0))
-                batch_index = tf.cast(batch_index,tf.int32)
-                batch_index = tf.reshape(tf.tile(batch_index,[1,(height-1)*(width-1)*channels]),[-1,1])
-                #get corresponding image coordinate
-                coordinate = tf.reshape(coordinate,[-1,1]) 
-                #print("coordinate_reshape",sess.run(coordinate)) 
-                Index = tf.concat([batch_index,coordinate],1)  
-                Index = tf.cast(Index,tf.int64)
-                #print("index",sess.run(Index))
-                #Im
-                #Value from U
-                Value_final=tf.reshape(Value_final,[num_batch*(height-1)*(width-1)*channels])
-                #print("Value_final",sess.run(Value_final))
-                #print("value_final_shape",sess.run(tf.shape(Value_final)))
-                sparse_values=tf.SparseTensor(indices=Index, values=Value_final, dense_shape=[num_batch,height*width*channels])
-                #print("sparse_values",sess.run(tf.shape(sparse_values)))
-                Value_from_U=tf.sparse_tensor_to_dense(sp_input=sparse_values,default_value=0,validate_indices=False)
-                Value_from_U=tf.cast(Value_from_U,'float32')
-                #print("Value_from_U",sess.run(Value_from_U))
-                #weights
-                thred=tf.zeros_like(Value_from_U_final,'float32')
-                weights=tf.Tensor.__gt__(Value_from_U,thred)
-                weights=tf.cast(weights,tf.float32)
-                Weights += weights
-                Value_from_U_final+=Value_from_U
+                    dim2 = width*channels
+                    dim1 = out_width*out_height*channels
+                    Base = tf.tile(tf.range(channels), [height*width*num_batch])
+                    # Base2 = _repeat(tf.range(num_batch)*dim1, dim1)
+                    # Base = tf.add(Base1, Base2)
+                    #Base = _repeat(tf.range(num_batch)*dim1, height*width*channels)
+                    # Base = tf.range(dim1)
+                    # Base = tf.tile(Base,tf.stack([num_batch]))
+                    Base = tf.reshape(Base,[num_batch,out_height,out_width,channels])
+                    #print("Base1",sess.run(Base))
+                    Base,_,_,_ = _split_input(Base,out_height,out_width)
+                    #print("Base2",sess.run(tf.shape(Base)))
+                    #print("Base3",sess.run(Base))
+                    #base = tf.transpose(Base)
+                    #print("base",sess.run(base))
+                    Base = tf.reshape(Base,[-1])
+                    print("Base reshape",sess.run(Base))
+                    print("base shape",sess.run(tf.shape(Base)))
+                    coordinate = Base + (coordy * width + coordx)* channels
+                    #Base_Y = Base + coordy*dim2
+                    #print("Base_Y",sess.run(Base_Y))
+                    # coordinate = Base_Y + coordx
+                    # #print("coordinate",sess.run(coordinate))
+                    # coordinate = tf.expand_dims(coordinate,0)
+                    print("coordinate",sess.run(coordinate))
+                    print("coordinate",sess.run(tf.shape(coordinate)))
+                    #get batch index
+                    # batch_index = []
+                    # for i in range(num_batch):
+                        # batch_index.append(i)
+                    # batch_index = tf.transpose(tf.expand_dims(tf.range(num_batch),0))
+                    # batch_index = tf.cast(batch_index,tf.int32)
+                    batch_index = tf.cast(tf.reshape(_repeat(tf.range(num_batch),(out_height-1)*(out_width-1)*channels,'int32'),[-1,1]),tf.int32)
+                    #get corresponding image coordinate
+                    coordinate = tf.reshape(coordinate,[-1,1]) 
+                    #print("coordinate_reshape",sess.run(coordinate)) 
+                    Index = tf.concat([batch_index,coordinate],1)  
+                    Index = tf.cast(Index,tf.int64)
+                    print("index",sess.run(Index))
+                    #Im
+                    #Value from U
+                    Value_final=tf.reshape(Value_final,[num_batch*(height-1)*(width-1)*channels])
+                    #print("Value_final",sess.run(Value_final))
+                    sparse_values=tf.SparseTensor(indices=Index, values=Value_final, dense_shape=[num_batch,out_height*out_width*channels])
+                    #print("sparse_values",sess.run(tf.shape(sparse_values)))
+                    Value_from_U=tf.sparse_tensor_to_dense(sp_input=sparse_values,default_value=0,validate_indices=False)
+                    Value_from_U=tf.cast(Value_from_U,'float32')
+                    #print("Value_from_U",sess.run(Value_from_U))
+                    #weights
+                    thred=tf.zeros_like(Value_from_U_final,'float32')
+                    weights=tf.Tensor.__gt__(Value_from_U,thred)
+                    weights=tf.cast(weights,tf.float32)
+                    Weights += weights
+                    Value_from_U_final+=Value_from_U
+                    gap_y = tf.less(0,Py_max-PY)
+                    gap_y = tf.cast(gap_y,'int32')
                 gap_x = tf.less(0,Px_max-PX)
-                gap_y = tf.less(0,Py_max-PY)
                 gap_x = tf.cast(gap_x,'int32')
-                gap_y = tf.cast(gap_y,'int32')
             #Weights=tf.cast(Weights,'float32')
             #print("Weights",sess.run(Weights))
             Weights = tf.clip_by_value(Weights,1e-10,1e+10)
@@ -190,14 +188,9 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
                             tf.transpose(tf.expand_dims(tf.linspace(-1.0, 1.0, width), 1), [1, 0]))
             y_t = tf.matmul(tf.expand_dims(tf.linspace(-1.0, 1.0, height), 1),
                             tf.ones(shape=tf.stack([1, width])))
-
             x_t_flat = tf.reshape(x_t, (1, -1))
             y_t_flat = tf.reshape(y_t, (1, -1))
-            #print("x_t_flat",sess.run(x_t_flat))
-            #print("x_t_flat_shape",sess.run(tf.shape(x_t_flat)))
             px,py = tf.stack([x_t_flat],axis=2),tf.stack([y_t_flat],axis=2)
-            #print("px",sess.run(px))
-            #print("px_shape",sess.run(tf.shape(px)))
             #source control points
             x,y = tf.linspace(-1.,1.,Column_controlP_number),tf.linspace(-1.,1.,Row_controlP_number)
             x,y = tf.meshgrid(x,y)
@@ -214,10 +207,8 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             ones = tf.ones_like(x_t_flat) 
             grid = tf.concat([ones, x_t_flat, y_t_flat,R],0)
             grid = tf.reshape(grid,[-1])
-            grid = _repeat(grid,channels)
+            grid = _repeat(grid,channels,'float32')
             grid = tf.reshape(grid,[Column_controlP_number*Row_controlP_number+3,height*width*channels])
-            #print("grid",sess.run(grid))
-            #print("grid_shape",sess.run(tf.shape(grid)))
             return grid
     def _transform(T, U, U_org,input_size,out_size,Column_controlP_number,Row_controlP_number):
         with tf.variable_scope('_transform'):
@@ -236,18 +227,19 @@ def TPS_decoder(U, U_org, T,input_size,out_size, Column_controlP_number,Row_cont
             # 19 * (H * W * C)
 
             grid = _meshgrid(U, out_height, out_width,Column_controlP_number,Row_controlP_number)
+            meshgrid_time = time.clock()
             grid = tf.expand_dims(grid, 0)
+            print('grid',sess.run(grid))
             grid = tf.reshape(grid, [-1])
-            print("gird_shape",sess.run(tf.shape(grid)))
             ## B * (19 * H * W * C)
             grid = tf.tile(grid, tf.stack([num_batch]))
-            print("grid_shape_final",sess.run(grid))
+            
             grid = tf.reshape(grid, tf.stack([num_batch, Column_controlP_number*Row_controlP_number+3, -1]))
-            print("grid_shape_finalshape",sess.run(grid))
             T_g = tf.matmul(T, grid)
             # x = B * 1 * (H * W * C)
             x_s = tf.slice(T_g, [0, 0, 0], [-1, 1, -1])
             y_s = tf.slice(T_g, [0, 1, 0], [-1, 1, -1])
+            print('x_s', sess.run(x_s))
             x_s_flat = tf.reshape(x_s, [-1])
             y_s_flat = tf.reshape(y_s, [-1])
             output_transformed = _triangle_interpolate(U,U_org,x_s_flat,y_s_flat,input_size,out_size)
