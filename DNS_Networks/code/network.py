@@ -2,27 +2,25 @@ import os
 import numpy as np
 import tensorflow as tf
 from data_reader import H5DataLoader
-from TPS_transformer import *
-from SpatialDecoderLayer import *
+from Dense_Transformer_Network import *
 from img_utils import imsave
 import ops
 
-class DilatedPixelCNN(object):
-
+class DenseTransformerNetwork(object):
     def __init__(self, sess, conf):
         #np.set_printoptions(threshold='nan')
         self.sess = sess
         self.conf = conf
         self.conv_size = (3, 3)
         self.pool_size = (2, 2)
-        self.tps_out_size = (40,40)
-        self.Column_controlP_number = 4
-        self.Row_controlP_number = 4    
-        self.inserttps = 3
-        self.insertdecoder = 3
-        self.out_size_D = (40, 40)
-        self.Column_controlP_number_D = 4
-        self.Row_controlP_number_D = 4
+        self.DTN_input_shape = [self.conf.batch, int(self.conf.height/(2**self.conf.dtn_location)),
+            int(self.conf.width/(2**self.conf.dtn_location)),
+            self.conf.start_channel_num*(2**self.conf.dtn_location)]
+        if self.conf.add_dtn == True:
+            self.transform = DSN_transformer(self.DTN_input_shape,self.conf.control_points_ratio)
+            self.insertdtn = self.conf.dtn_location
+        else:
+            self.insertdtn = -1
         self.data_format = 'NHWC'
         self.axis, self.channel_axis = (1, 2), 3
         self.input_shape = [
@@ -102,15 +100,13 @@ class DilatedPixelCNN(object):
     def inference(self, inputs):
         outputs = inputs
         down_outputs = []
-        T_outputs = []
-        conv_list = []
         for layer_index in range(self.conf.network_depth-1):
             is_first = True if not layer_index else False
             name = 'down%s' % layer_index
-            if layer_index == self.inserttps:
-                outputs = self.construct_down_block(outputs, name, down_outputs, T_outputs ,conv_list,first=is_first,TPS = True)
+            if layer_index == self.insertdtn:
+                outputs = self.construct_down_block(outputs, name, down_outputs,first=is_first,TPS = True)
             else:
-                outputs = self.construct_down_block(outputs, name, down_outputs,T_outputs ,conv_list, first=is_first,TPS = False)  
+                outputs = self.construct_down_block(outputs, name, down_outputs, first=is_first,TPS = False)  
             print("down ",layer_index," shape ", outputs.get_shape())          
         outputs = self.construct_bottom_block(outputs, 'bottom')
         print("bottom shape",outputs.get_shape())
@@ -118,32 +114,21 @@ class DilatedPixelCNN(object):
             is_final = True if layer_index == 0 else False
             name = 'up%s' % layer_index
             down_inputs = down_outputs[layer_index]
-            if layer_index == self.insertdecoder:
-                T = T_outputs[0]
-                ori_feature=conv_list[0]
+            if layer_index == self.insertdtn:
                 Decoder = True
             else:
                 Decoder = False
-                print
-                T = []
-            outputs = self.construct_up_block(outputs, down_inputs, name, T,ori_feature,final=is_final,Decoder=Decoder )
+            outputs = self.construct_up_block(outputs, down_inputs, name,final=is_final,Decoder=Decoder )
             print("up ",layer_index," shape ",outputs.get_shape())
         return outputs
 
-    def construct_down_block(self, inputs, name, down_outputs, cp_outputs,conv_list,first=False,TPS=False):
+    def construct_down_block(self, inputs, name, down_outputs,first=False,TPS=False):
         num_outputs = self.conf.start_channel_num if first else 2 * \
             inputs.shape[self.channel_axis].value
         conv1 = ops.conv2d(
             inputs, num_outputs, self.conv_size, name+'/conv1')
         if TPS == True:
-            conv_list.append(conv1)
-            self.TPS_input = conv1
-            transform = transformer(conv1,conv1,self.Column_controlP_number,self.Row_controlP_number,self.tps_out_size)
-            conv1,T,cp= transform.TPS_transformer(conv1,conv1)
-            self.TPS_output = conv1
-            cp_outputs.append(T)
-            self.T = T
-            self.cp = cp
+            conv1= self.transform.Encoder(conv1,conv1)
         conv2 = ops.conv2d(
             conv1, num_outputs, self.conv_size, name+'/conv2',)
         down_outputs.append(conv2)
@@ -159,7 +144,7 @@ class DilatedPixelCNN(object):
             conv1, num_outputs, self.conv_size, name+'/conv2')
         return conv2
 
-    def construct_up_block(self, inputs, down_inputs, name,T, ori_feature,final = False,Decoder=False):
+    def construct_up_block(self, inputs, down_inputs, name,final = False,Decoder=False):
         num_outputs = inputs.shape[self.channel_axis].value
         conv1 = self.deconv_func()(
             inputs, num_outputs, self.conv_size, name+'/conv1')
@@ -168,10 +153,7 @@ class DilatedPixelCNN(object):
         conv2 = self.conv_func()(
             conv1, num_outputs, self.conv_size, name+'/conv2')
         if Decoder == True:
-            self.Decoder_input = conv2
-            inverse_trans = inverse_transformer(conv2,self.Column_controlP_number_D,self.Row_controlP_number_D,self.out_size_D)
-            conv2 = inverse_trans.TPS_decoder(conv2,conv2,T)
-            self.Decoder_output = conv2
+            conv2 = self.transform.Decoder(conv2,conv2)
         num_outputs = self.conf.class_num if final else num_outputs/2
         conv3 = ops.conv2d(
             conv2, num_outputs, self.conv_size, name+'/conv3')
@@ -213,8 +195,8 @@ class DilatedPixelCNN(object):
                 inputs, annotations = train_reader.next_batch(self.conf.batch)
                 feed_dict = {self.inputs: inputs,
                              self.annotations: annotations}
-                loss,T,cp,TPS_input,TPS_output,Decoder_input,Decoder_output,_ = self.sess.run(
-                    [self.loss_op, self.T, self.cp,self.TPS_input,self.TPS_output, self.Decoder_input,self.Decoder_output,self.train_op], feed_dict=feed_dict)
+                loss,_ = self.sess.run(
+                    [self.loss_op,self.train_op], feed_dict=feed_dict)
 
             if epoch_num % self.conf.save_step == 1:
                 self.save(epoch_num)
@@ -246,6 +228,20 @@ class DilatedPixelCNN(object):
             accuracies.append(accuracy)
             m_ious.append(m_iou)
         return np.mean(losses),np.mean(accuracies),m_ious[-1]
+
+    def tests(self,sess,conf,start,end,step):
+        valid_loss = []
+        valid_accuracy = []
+        valid_m_iou = []
+        model = DenseTransformerNetwork(tf.Session(), conf)
+        for i in range(self.conf.test_start_epoch,self.conf.test_end_epoch,self.conf.test_stride_of_epoch):
+            loss,acc,m_iou=model.test(i)
+            valid_loss.append(loss)
+            valid_accuracy.append(acc)
+            valid_m_iou.append(m_iou)
+            print('valid_loss',valid_loss)
+            print('valid_accuracy',valid_accuracy)
+            print('valid_m_iou',valid_m_iou)
 
     def predict(self):
         print('---->predicting ', self.conf.test_epoch)

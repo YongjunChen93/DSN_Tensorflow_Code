@@ -1,33 +1,36 @@
+#python 3.0
+#coding:UTF-8
+'''
+@author Yongjun Chen 
+'''
+#2D version of Dense Transformer Networks
 import tensorflow as tf
 import numpy as np
-from tf_utils import weight_variable, bias_variable, dense_to_one_hot
 from ops import *
 
-class transformer(object):
-    def __init__(self,U,U_local,Column_controlP_number,Row_controlP_number,out_size):
-        self.initial = np.array([[-5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5., -5., -0.4, 0.4, 5.],[-5., -5., -5., -5., -0.4, -0.4, -0.4, -0.4, 0.4, 0.4, 0.4, 0.4, 5., 5., 5.,5.]])
-        self.local_num_batch = U_local.shape[0].value
-        self.local_height = U_local.shape[1].value
-        self.local_width = U_local.shape[2].value
-        self.local_num_channels = U_local.shape[3].value
-
-        self.num_batch = U.shape[0].value
-        self.height = U.shape[1].value
-        self.width = U.shape[2].value
-        self.num_channels = U.shape[3].value
-        
+class DSN_transformer(object):
+    def __init__(self,input_shape,control_points_ratio):
+        self.num_batch = input_shape[0]
+        self.height = input_shape[1]
+        self.width = input_shape[2]
+        self.num_channels = input_shape[3]
         self.out_height = self.height
         self.out_width = self.width
-        self.out_size = out_size
-        self.Column_controlP_number = Column_controlP_number
-        self.Row_controlP_number = Row_controlP_number
+        self.Column_controlP_number = int(input_shape[1] / \
+                        (control_points_ratio))
+        self.Row_controlP_number = int(input_shape[2] / \
+                        (control_points_ratio))
+        init_x = np.linspace(-5,5,self.Column_controlP_number)
+        init_y = np.linspace(-5,5,self.Row_controlP_number)
+        x_s,y_s = np.meshgrid(init_x, init_y)       
+        self.initial = np.array([x_s,y_s])
 
     def _local_Networks(self,input_dim,x):
         with tf.variable_scope('_local_Networks'):
-            x = tf.reshape(x,[-1,self.local_height*self.local_width*self.local_num_channels])
-            W_fc_loc1 = weight_variable([self.local_height*self.local_width*self.local_num_channels, 20])
+            x = tf.reshape(x,[-1,self.height*self.width*self.num_channels])
+            W_fc_loc1 = weight_variable([self.height*self.width*self.num_channels, 20])
             b_fc_loc1 = bias_variable([20])
-            W_fc_loc2 = weight_variable([20, 32])
+            W_fc_loc2 = weight_variable([20, self.Column_controlP_number*self.Row_controlP_number*2])
             initial = self.initial.astype('float32')
             initial = initial.flatten()
             b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
@@ -71,11 +74,11 @@ class transformer(object):
             T = tf.transpose(tf.matmul(Deltas_inv_f,cp),[0,2,1])
             return T
 
-    def _repeat(self,x, n_repeats):
+    def _repeat(self,x, n_repeats, type):
         with tf.variable_scope('_repeat'):
             rep = tf.transpose(
                 tf.expand_dims(tf.ones(shape=tf.stack([n_repeats, ])), 1), [1, 0])
-            rep = tf.cast(rep, 'int32')
+            rep = tf.cast(rep, type)
             x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
             return tf.reshape(x, [-1])
 
@@ -103,7 +106,7 @@ class transformer(object):
             y1 = tf.clip_by_value(y1, zero, max_y)
             dim2 = self.width
             dim1 = self.width*self.height
-            base = self._repeat(tf.range(self.num_batch)*dim1, self.out_height*self.out_width)
+            base = self._repeat(tf.range(self.num_batch)*dim1, self.out_height*self.out_width,'int32')
             base_y0 = base + y0*dim2
             base_y1 = base + y1*dim2
             idx_a = base_y0 + x0
@@ -130,6 +133,63 @@ class transformer(object):
             output = tf.add_n([wa*Ia, wb*Ib, wc*Ic, wd*Id])
             return output
 
+    def _bilinear_interpolate(self,im, im_org, x, y):
+        with tf.variable_scope('_interpolate'):
+            # constants
+            x = tf.cast(x, 'float32')
+            y = tf.cast(y, 'float32')
+            height_f = tf.cast(self.height, 'float32')
+            width_f = tf.cast(self.width, 'float32')
+            zero = tf.zeros([], dtype='int32')
+            max_y = tf.cast(tf.shape(im)[1] - 1, 'int32')
+            max_x = tf.cast(tf.shape(im)[2] - 1, 'int32')
+            # scale indices from [-1, 1] to [0, width/height]
+            x = (x + 1.0)*(width_f) / 2.0
+            y = (y + 1.0)*(height_f) / 2.0
+            # do sampling
+            x0 = tf.cast(tf.floor(x), 'int32')
+            x1 = x0 + 1
+            y0 = tf.cast(tf.floor(y), 'int32')
+            y1 = y0 + 1
+            x0 = tf.clip_by_value(x0, zero, max_x)
+            x1 = tf.clip_by_value(x1, zero, max_x)
+            y0 = tf.clip_by_value(y0, zero, max_y)
+            y1 = tf.clip_by_value(y1, zero, max_y)
+            dim2 = self.width
+            dim1 = self.width*self.height
+            base = self._repeat(tf.range(self.num_batch)*dim1, self.out_height*self.out_width, 'int32')
+            base_y0 = base + y0*dim2
+            base_y1 = base + y1*dim2
+            idx_a = tf.expand_dims(base_y0 + x0, 1)
+            idx_b = tf.expand_dims(base_y1 + x0, 1)
+            idx_c = tf.expand_dims(base_y0 + x1, 1)
+            idx_d = tf.expand_dims(base_y1 + x1, 1)
+            # use indices to lookup pixels in the flat image and restore
+            # channels dim
+            im_flat = tf.reshape(im, tf.stack([-1, self.num_channels]))
+            im_flat = tf.cast(im_flat, 'float32')
+            Ia = tf.scatter_nd(idx_a, im_flat, [self.num_batch*self.out_height*self.out_width, self.num_channels])
+            Ib = tf.scatter_nd(idx_b, im_flat, [self.num_batch*self.out_height*self.out_width, self.num_channels])
+            Ic = tf.scatter_nd(idx_c, im_flat, [self.num_batch*self.out_height*self.out_width, self.num_channels])
+            Id = tf.scatter_nd(idx_d, im_flat, [self.num_batch*self.out_height*self.out_width, self.num_channels])
+
+            x0_f = tf.cast(x0, 'float32')
+            x1_f = tf.cast(x1, 'float32')
+            y0_f = tf.cast(y0, 'float32')
+            y1_f = tf.cast(y1, 'float32')
+            wa = tf.scatter_nd(idx_a, tf.expand_dims(((x1_f-x) * (y1_f-y)), 1), [self.num_batch*self.out_height*self.out_width, 1])
+            wb = tf.scatter_nd(idx_b, tf.expand_dims(((x1_f-x) * (y-y0_f)), 1), [self.num_batch*self.out_height*self.out_width, 1])
+            wc = tf.scatter_nd(idx_c, tf.expand_dims(((x-x0_f) * (y1_f-y)), 1), [self.num_batch*self.out_height*self.out_width, 1])
+            wd = tf.scatter_nd(idx_d, tf.expand_dims(((x-x0_f) * (y-y0_f)), 1), [self.num_batch*self.out_height*self.out_width, 1])
+
+            value_all = tf.add_n([wa*Ia, wb*Ib, wc*Ic, wd*Id])
+            weight_all = tf.clip_by_value(tf.add_n([wa, wb, wc, wd]),1e-5,1e+10)
+            flag = tf.less_equal(weight_all, 1e-5* tf.ones_like(weight_all))
+            flag = tf.cast(flag, tf.float32)
+            im_org = tf.reshape(im_org, [-1,self.num_channels])
+            output = tf.add(tf.div(value_all, weight_all), tf.multiply(im_org, flag))
+            return output
+
     def _meshgrid(self):
         with tf.variable_scope('_meshgrid'):
             x_t = tf.matmul(tf.ones(shape=tf.stack([self.out_height, 1])),
@@ -152,9 +212,11 @@ class transformer(object):
             #Source coordinates
             ones = tf.ones_like(x_t_flat) 
             grid = tf.concat([ones, x_t_flat, y_t_flat,R],0)
+            grid = tf.reshape(grid,[-1])
+            grid = tf.reshape(grid,[self.Column_controlP_number*self.Row_controlP_number+3,self.out_height*self.out_width])
             return grid
 
-    def _transform(self, T, input_dim):
+    def _transform(self, T, U, U_org, Trans):
         with tf.variable_scope('_transform'): 
             T = tf.reshape(T, (-1, 2, self.Column_controlP_number*self.Row_controlP_number+3))
             T = tf.cast(T, 'float32')
@@ -171,15 +233,28 @@ class transformer(object):
             y_s = tf.slice(T_g, [0, 1, 0], [-1, 1, -1])
             x_s_flat = tf.reshape(x_s, [-1])
             y_s_flat = tf.reshape(y_s, [-1])
-            input_transformed = self._interpolate(
-                input_dim, x_s_flat, y_s_flat)
+            if Trans == 'Encoder':
+                output_transformed = self._interpolate(
+                    U, x_s_flat, y_s_flat)
+            elif Trans == 'Decoder':
+                output_transformed = self._bilinear_interpolate(U,U_org,x_s_flat,y_s_flat)
+            else:
+                print("error type")
+                return
             output = tf.reshape(
-                input_transformed, tf.stack([self.num_batch, self.out_height, self.out_width, self.num_channels]))
+                output_transformed, tf.stack([self.num_batch, self.out_height, self.out_width, self.num_channels]))
             return output
 
-    def TPS_transformer(self, U, U_local,name='SpatialTransformer', **kwargs):
+    def Encoder(self, U, U_local,name='SpatialTransformer', **kwargs):
         with tf.variable_scope(name):
             cp = self._local_Networks(U,U_local)
-            T= self._makeT(cp)
-            output = self._transform(T, U)
-            return output,T,cp
+            self.T= self._makeT(cp)
+            output = self._transform(self.T, U, U, Trans = 'Encoder')
+            return output
+
+    def Decoder(self,U, U_org,name='SpatialDecoderLayer', **kwargs):
+        with tf.variable_scope(name):
+            output = self._transform(self.T, U, U_org,Trans = 'Decoder')
+            return output
+
+
