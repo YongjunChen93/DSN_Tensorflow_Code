@@ -22,7 +22,6 @@ Ji},
 
 
 ## Experimental results:
-
 We perform our experiment on two datasets to compare the baseline U-Net model and the proposed DTN model.
 
 1. PASCAL dataset
@@ -37,7 +36,6 @@ fourth rows are the segmentation results of U-Net and DTN, respectively.
 ![image](https://github.com/divelab/dtn/blob/master/results/SNEMI3Dresult.PNG)
 
 
-<<<<<<< HEAD
 ## Dense Transformer Networks
 
 ![image](https://github.com/divelab/dtn/blob/master/results/architecture.PNG)
@@ -167,47 +165,3 @@ If you want to use Dense Transformer Networks, just Fill the add_dtn, dtn_locati
 
 
 
-=======
-## How to use
-
-![image](https://github.com/divelab/dtn/blob/master/results/architecture.PNG)
-
-### TPS_transformer
-
-```
-Parameters  
-
-* U: the input of spatial transformer.  
-* U_local: the input of localization networks.  
-```
-
-### TPS_decoder
-
-```
-Parameters  
-
-* U: the input of spatial deocder transformer.  
-* U_org: the original feature maps to fill the missing pixels.  
-* T: the transformation shared with TPS_transformer.  
-```
-
-### A simple running example
-```
-	U=tf.linspace(1.0,10.0,100)
-	U =tf.reshape(U,[2,5,5,2])
-	#encoder initial
-	X_controlP_number = 4
-	Y_controlP_number = 4
-	tps_out_size = (40,40)
-	#decoder initial
-	X_controlP_number_D = 4
-	Y_controlP_number_D = 4
-	out_size_D = (40, 40)
-	# encoder
-	transform = transformer(U,U,X_controlP_number,Y_controlP_number,tps_out_size)
-	conv1,T,cp= transform.TPS_transformer(U,U)
-	#decoder
-	inverse_trans = inverse_transformer(conv1,X_controlP_number_D,Y_controlP_number_D,out_size_D)
-	conv2 = inverse_trans.TPS_decoder(conv1,conv1,T)
-  ```
->>>>>>> origin/master

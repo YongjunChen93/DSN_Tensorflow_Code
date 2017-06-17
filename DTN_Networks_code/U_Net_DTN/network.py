@@ -8,7 +8,6 @@ import ops
 
 class DenseTransformerNetwork(object):
     def __init__(self, sess, conf):
-        #np.set_printoptions(threshold='nan')
         self.sess = sess
         self.conf = conf
         self.conv_size = (3, 3)
