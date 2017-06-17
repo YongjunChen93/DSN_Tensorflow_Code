@@ -36,9 +36,54 @@ fourth rows are the segmentation results of U-Net and DTN, respectively.
 ![image](https://github.com/divelab/dtn/blob/master/results/SNEMI3Dresult.PNG)
 
 
-## Dense Transformer Networks
+## What is Dense Transformer Networks
 
 ![image](https://github.com/divelab/dtn/blob/master/results/architecture.PNG)
+
+## Add 2D Dense Transformer Networks to your Neural Networks
+
+If you want to add the 2D Dense Transformer Networks to your own Networks. You just need to download the codes in ```DTN_Networks_code/U_Net_DTN/``` folder. In the folder, you can only add Affine, TPS transformation or the DTN networks.
+
+Here is a example how to add it to your own Networks:
+
+```
+from Dense_Transformer_Network import *
+import numpy as np
+import tensorflow as tf
+
+# sample inputs (Shape: NHWC)
+U=tf.linspace(1.0,10.0,2*8*8*2)
+U =tf.reshape(U,[2,8,8,2])
+
+# parameters setup in network initial
+dtn_input_shape = [2,8,8,2]
+control_points_ratio = 2
+
+# parameters setup initial DTN class
+transform = DSN_transformer(dtn_input_shape,control_points_ratio)
+
+# encoder layer
+conv1= transform.Encoder(U,U)
+
+# decoder layer
+conv2 = transform.Decoder(conv1,conv1)
+
+```
+## Add 2D Dense Transformer Networks to a standard U-NET for semantic segmentation
+
+If you just want to use DTN based on U-NET for semantic segmentation, you just need to download the whole codes in ```DTN_VOC_2012_experiments``` folder. And then change the model's setup based on your task on ``` main.py``` 
+
+Here is the instruction of how to set up the standard U-NET with Dense Transformer Networks:
+
+### System requirement
+
+#### Programming language
+
+Python 3.5+
+
+#### Python Packages
+
+tensorflow (CPU) or tensorflow-gpu (GPU), numpy, h5py, os.
 
 ## Configure the network
 
@@ -159,7 +204,7 @@ The predicted segmentation results will be in sampledir set in main.py, colored.
 
 ## Use Dense Transformer Networks 
 
-If you want to use Dense Transformer Networks, just Fill the add_dtn, dtn_location and control_points_ratio in configure function.
+Once you successful setup the model, then can start your deep learning and enjoy it!
 
 
 
