@@ -212,7 +212,6 @@ class DenseTransformerNetwork(object):
         valid_reader = H5DataLoader(
             self.conf.data_dir+self.conf.valid_data, False)
         self.sess.run(tf.local_variables_initializer())
-        count = 0
         losses = []
         accuracies = []
         m_ious = []
@@ -258,7 +257,6 @@ class DenseTransformerNetwork(object):
         losses = []
         accuracies = []
         m_ious = []
-        count=0
         while True:
             inputs, annotations = test_reader.next_batch(self.conf.batch)
             if inputs.shape[0] < self.conf.batch:
