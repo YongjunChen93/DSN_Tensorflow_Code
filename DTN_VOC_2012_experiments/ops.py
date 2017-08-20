@@ -107,11 +107,17 @@ def pool2d(inputs, kernel_size, scope, data_format='NHWC'):
     return tf.contrib.layers.max_pool2d(
         inputs, kernel_size, scope=scope, padding='SAME',
         data_format=data_format)
-
-def weight_variable(shape):
+bias_variable
+def bias_variable(shape):
     initial = tf.zeros(shape)
     return tf.Variable(initial)
 
-def bias_variable(shape):
+def weight_variable(shape):
     initial = tf.random_normal(shape, mean=0.0, stddev=0.01)
     return tf.Variable(initial)
+
+def get_mask(label):
+    mask = np.ones_like(label)*255
+    mask = np.not_equal(label ,mask)
+    mask = mask.astype(int)
+    return mask

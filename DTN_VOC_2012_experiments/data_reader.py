@@ -3,7 +3,7 @@ import h5py
 import tensorflow as tf
 import numpy as np
 from img_utils import get_images
-
+import ops
 
 class FileDataReader(object):
 
@@ -29,6 +29,8 @@ class H5DataLoader(object):
         self.is_train = is_train
         data_file = h5py.File(data_path, 'r')
         self.images, self.labels = data_file['X'], data_file['Y']
+        mask = ops.get_mask(self.labels)
+        self.labels = np.multiply(self.labels, mask)
         self.gen_indexes()
 
     def gen_indexes(self):
