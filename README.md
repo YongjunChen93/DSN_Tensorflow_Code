@@ -9,7 +9,7 @@ Dense Transformer Networks can extract features based on irregular areas, whose 
 In the meantime, Dense Transformer Networks provide a method that efficiently restores spatial relations.
 
 ## Citation
-If using this code, please cite our paper.
+Please cite our paper for any usage for this code.
 ```
 @article{li2017dtn,
   title={Dense Transformer Networks},
@@ -22,7 +22,7 @@ Ji},
 
 
 ## Experimental results:
-We perform our experiment on two datasets to compare the baseline U-Net model and the proposed DTN model.
+We perform our experiments on two datasets to compare the baseline U-Net model and the proposed DTN model.
 
 1. PASCAL dataset
 
@@ -44,7 +44,7 @@ fourth rows are the segmentation results of U-Net and DTN, respectively.
 
 If you want to add the 2D Dense Transformer Networks to your own Networks. You just need to download the codes in ```DTN_Networks_code/U_Net_DTN/``` folder. In the folder, you can only add Affine, TPS transformation or the DTN networks.
 
-Here is a example how to add it to your own Networks:
+Here is an example how to add it to your own Networks:
 
 ```
 from Dense_Transformer_Network import *
